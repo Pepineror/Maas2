@@ -1,0 +1,14 @@
+fastapi==0.124.4
+uvicorn==0.38.0
+requests==2.32.5
+python-multipart==0.0.20
+Jinja2==3.1.6
+pydantic==2.12.5
+httpx==0.28.1
+PyJWT==2.10.1
+python-dotenv==1.2.1
+agno[ollama]==2.3.12
+
+# Optional provider SDKs (they may be resolved by agno extras)
+anthropic
+openai

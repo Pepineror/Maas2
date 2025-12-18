@@ -1,0 +1,18 @@
+# Root .dockerignore to speed up builds and avoid leaking secrets
+.git
+node_modules
+control_plane_ui/node_modules
+.venv
+venv
+env
+__pycache__
+*.pyc
+.DS_Store
+*.log
+.env
+.idea
+/.gitignore
+control_plane_ui/.next
+control_plane_ui/.env
+control_plane_ui/node_modules
+maas_document_system/__pycache__

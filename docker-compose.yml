@@ -1,0 +1,30 @@
+services:
+  maas-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "4000:8000"
+    env_file:
+      - .env
+    environment:
+      REDMINE_BASE_URL: ${REDMINE_BASE_URL}
+      REDMINE_API_KEY: ${REDMINE_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      MAAS_API_KEY_SECRET: ${MAAS_API_KEY_SECRET}
+    volumes:
+      - ./maas_document_system:/app/maas_document_system
+
+  maas-ui:
+    build:
+      context: ./control_plane_ui
+      dockerfile: Dockerfile
+    ports:
+      - "4001:3000"
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://maas-backend:8000
+      PORT: 3000
+    depends_on:
+      - maas-backend
