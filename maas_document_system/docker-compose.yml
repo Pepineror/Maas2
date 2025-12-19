@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main-slim
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    volumes:
+      - openwebui_data:/data
+    networks:
+      - maas_net
+    depends_on:
+      - mas
+
+  agentops:
+    build:
+      context: ../agentops/app
+      dockerfile: api/Dockerfile
+    image: agentops:local
+    restart: unless-stopped
+    # When using host network mode AgentOps binds to host interfaces
+    network_mode: 'host'
+    # Expose ports mapping is ignored in host mode, document them here
+    ports:
+      - "8000:8000"
+      - "3000:3000"
+    volumes:
+      - ../agentops/app:/app:rw
+    env_file:
+      - ../agentops/app/.env.example
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mas
+
+  mas:
+    image: maas22-maas-backend:latest
+    # Optional build if you prefer to build locally from the repo root
+    build:
+      context: ..
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    ports:
+      - "4000:8000"
+    volumes:
+      - mas_data:/data
+    networks:
+      - maas_net
+    environment:
+      # Add MAS-specific env vars or use an .env file in this directory
+      - APP_ENV=development
+
+volumes:
+  openwebui_data:
+  agentops_data:
+  mas_data:
+
+networks:
+  maas_net:
+    driver: bridge
