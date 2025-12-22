@@ -29,6 +29,21 @@ services:
       - openwebui-data:/app/backend/data
     environment:
       - 'WEBUI_SECRET_KEY='
+      - 'OLLAMA_BASE_URL='
+      - 'OPENAI_API_BASE_URL='
+      - 'OPENAI_API_KEY=sk-dummy'
+      # Disable RAG and local models
+      - RAG_EMBEDDING_ENGINE=
+      - RAG_RERANKING_ENGINE=
+      - ENABLE_RAG_WEB_SEARCH=False
+      - ENABLE_OLLAMA_API=False
+      - ENABLE_OPENAI_API=True
+      - ENABLE_MODEL_FILTER=True
+      - MODEL_FILTER_ENABLED=False
+      - ENABLE_ADMIN_CHAT_ACCESS=True
+      - SHOW_ADMIN_DETAILS=True
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
     networks:
       - maas-network
 
@@ -100,6 +115,11 @@ services:
       - CLICKHOUSE_USERNAME=default
       - CLICKHOUSE_PASSWORD=password
       - CLICKHOUSE_DATABASE=otel_2
+      - JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
+      - LOGS_TABLE_NAME=otel_logs
+      - TRACES_TABLE_NAME=otel_traces
+      - CLICKHOUSE_TIMEOUT=30
+      - CLICKHOUSE_TTL=168h
     depends_on:
       - clickhouse
     networks:
@@ -151,6 +171,8 @@ services:
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@supabase-db:5432/postgres
       GOTRUE_SITE_URL: http://localhost:8002
+      GOTRUE_API_EXTERNAL_URL: http://localhost:54321
+      API_EXTERNAL_URL: http://localhost:54321
       GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
       GOTRUE_JWT_EXP: 3600
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
