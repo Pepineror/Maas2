@@ -1,202 +1,43 @@
+version: '3.8'
+
 services:
-  # --- MAS Backend ---
-  maas-backend:
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile
+    container_name: maas-backend
     ports:
-      - "4000:8000"
+      - "8000:8000"
     env_file:
       - .env
     environment:
-      REDMINE_BASE_URL: ${REDMINE_BASE_URL}
-      REDMINE_API_KEY: ${REDMINE_API_KEY}
-      JWT_SECRET: ${JWT_SECRET}
-      MAAS_API_KEY_SECRET: ${MAAS_API_KEY_SECRET}
-      AGENTOPS_API_KEY: "6b7a1469-bdcb-4d47-85ba-c4824bc8486e" # From AgentOps seed
-      AGENTOPS_API_ENDPOINT: "http://agentops-api:8000"
+      - DATABASE_URL=postgresql://maas_user:maas_pass@db:5432/maas_db
     volumes:
-      - ./maas_document_system:/app/maas_document_system
+      - ./backend:/app/backend
+      - ./storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - maas-network
 
-  # --- OpenWebUI ---
-  openwebui:
-    image: ghcr.io/open-webui/open-webui:main-slim
-    ports:
-      - "3000:8080"
+  db:
+    image: postgres:15-alpine
+    container_name: maas-db
+    environment:
+      - POSTGRES_USER=maas_user
+      - POSTGRES_PASSWORD=maas_pass
+      - POSTGRES_DB=maas_db
     volumes:
-      - openwebui-data:/app/backend/data
-    environment:
-      - 'WEBUI_SECRET_KEY='
-      - 'OLLAMA_BASE_URL='
-      - 'OPENAI_API_BASE_URL='
-      - 'OPENAI_API_KEY=sk-dummy'
-      # Disable RAG and local models
-      - RAG_EMBEDDING_ENGINE=
-      - RAG_RERANKING_ENGINE=
-      - ENABLE_RAG_WEB_SEARCH=False
-      - ENABLE_OLLAMA_API=False
-      - ENABLE_OPENAI_API=True
-      - ENABLE_MODEL_FILTER=True
-      - MODEL_FILTER_ENABLED=False
-      - ENABLE_ADMIN_CHAT_ACCESS=True
-      - SHOW_ADMIN_DETAILS=True
-    sysctls:
-      - net.ipv6.conf.all.disable_ipv6=1
-    networks:
-      - maas-network
-
-  # --- AgentOps Services ---
-  agentops-api:
-    build:
-      context: ./agentops/app
-      dockerfile: api/Dockerfile
-    ports:
-      - "8001:8000"
-    env_file:
-      - agentops.env
-    depends_on:
-      - clickhouse
-      - redis
-      - otel-collector
-      - supabase
-    networks:
-      - maas-network
-
-  agentops-dashboard:
-    build:
-      context: ./agentops/app/dashboard
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: http://supabase:54321
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0}
-        NEXT_PUBLIC_API_URL: http://agentops-api:8000
-    ports:
-      - "8002:3000"
-    env_file:
-      - agentops.env
-    depends_on:
-      - agentops-api
-    networks:
-      - maas-network
-
-  # --- AgentOps Infrastructure ---
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.12
-    ports:
-      - "9000:9000"
-      - "8123:8123"
-    environment:
-      - CLICKHOUSE_DB=otel_2
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=password
-    volumes:
-      - clickhouse-data:/var/lib/clickhouse
-    networks:
-      - maas-network
-
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    networks:
-      - maas-network
-
-  otel-collector:
-    build:
-      context: ./agentops/app/opentelemetry-collector
-      dockerfile: Dockerfile
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-    environment:
-      - CLICKHOUSE_ENDPOINT=http://clickhouse:8123
-      - CLICKHOUSE_USERNAME=default
-      - CLICKHOUSE_PASSWORD=password
-      - CLICKHOUSE_DATABASE=otel_2
-      - JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
-      - LOGS_TABLE_NAME=otel_logs
-      - TRACES_TABLE_NAME=otel_traces
-      - CLICKHOUSE_TIMEOUT=30
-      - CLICKHOUSE_TTL=168h
-    depends_on:
-      - clickhouse
-    networks:
-      - maas-network
-
-  # --- Supabase Stack (Self-Hosted Minimal) ---
-  supabase:
-    image: kong:2.8.1
-    restart: always
-    environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /app/kong.yml
-      KONG_PROXY_LISTEN: 0.0.0.0:54321
-    volumes:
-      - ./agentops/app/supabase/kong.yml:/app/kong.yml:ro
-    ports:
-      - "54321:54321"
-    networks:
-      - maas-network
-    depends_on:
-      - supabase-auth
-      - supabase-rest
-
-  supabase-db:
-    image: supabase/postgres:15.1.1.78
-    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+      - ./volumes/db_data:/var/lib/postgresql/data
     healthcheck:
-      test: pg_isready -U postgres -h localhost
+      test: [ "CMD-SHELL", "pg_isready -U maas_user -d maas_db" ]
       interval: 5s
       timeout: 5s
-      retries: 10
-    environment:
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-    volumes:
-      - supabase-db-data:/var/lib/postgresql/data
-      - ./agentops/app/supabase/migrations:/docker-entrypoint-initdb.d/migrations
-      - ./agentops/app/supabase/seed.sql:/docker-entrypoint-initdb.d/seed.sql
-    networks:
-      - maas-network
-
-  supabase-auth:
-    image: supabase/gotrue:v2.132.3
-    depends_on:
-      supabase-db:
-        condition: service_healthy
-    environment:
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@supabase-db:5432/postgres
-      GOTRUE_SITE_URL: http://localhost:8002
-      GOTRUE_API_EXTERNAL_URL: http://localhost:54321
-      API_EXTERNAL_URL: http://localhost:54321
-      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
-      GOTRUE_JWT_EXP: 3600
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
-    networks:
-      - maas-network
-
-  supabase-rest:
-    image: postgrest/postgrest:v12.0.2
-    depends_on:
-      supabase-db:
-        condition: service_healthy
-    environment:
-      PGRST_DB_URI: postgres://postgres:postgres@supabase-db:5432/postgres
-      PGRST_DB_SCHEMAS: public,storage,graphql_public
-      PGRST_DB_ANON_ROLE: anon
-      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      retries: 5
     networks:
       - maas-network
 
 networks:
   maas-network:
     driver: bridge
-
-volumes:
-  openwebui-data:
-  clickhouse-data:
-  supabase-db-data:

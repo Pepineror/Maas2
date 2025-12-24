@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+
+# Database and Storage
+storage/*.db
+outputs/
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker
+.docker/
